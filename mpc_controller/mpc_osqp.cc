@@ -45,11 +45,11 @@ using Eigen::VectorXd;
 #include "qpOASES/Types.hpp"
 
 using qpOASES::QProblem;
-  
+
 typedef Eigen::Matrix<qpOASES::real_t, Eigen::Dynamic, Eigen::Dynamic,
                       Eigen::RowMajor>
     RowMajorMatrixXd;
-    
+
 constexpr int k3Dim = 3;
 constexpr double kGravity = 9.8;
 constexpr double kMaxScale = 10;
@@ -201,7 +201,7 @@ public:
 
     ConvexMpc(double mass, const std::vector<double>& inertia, int num_legs,
         int planning_horizon, double timestep,
-        const std::vector<double>& qp_weights, double alpha = 1e-5, 
+        const std::vector<double>& qp_weights, double alpha = 1e-5,
           QPSolverName qp_solver_name=QPOASES);
 
     virtual ~ConvexMpc()
@@ -288,7 +288,7 @@ private:
     Eigen::VectorXd constraint_ub_;  // 5 * num_legs * horizon
 
     std::vector<double> qp_solution_;
-    
+
     ::OSQPWorkspace* workspace_;
     // Whether optimizing for the first step
     bool initial_run_;
@@ -618,7 +618,7 @@ std::vector<double> ConvexMpc::ComputeContactForces(
     std::vector<double> desired_com_angular_velocity) {
 
     std::vector<double> error_result;
-    
+
 
     // First we compute the foot positions in the world frame.
     DCHECK_EQ(com_roll_pitch_yaw.size(), k3Dim);
@@ -719,9 +719,9 @@ std::vector<double> ConvexMpc::ComputeContactForces(
         mass_ * kGravity * kMinScale,
         foot_friction_coeffs[0], planning_horizon_,
         &constraint_lb_, &constraint_ub_);
-    
-    
-    
+
+
+
     if (qp_solver_name_ == OSQP)
     {
       UpdateConstraintsMatrix(foot_friction_coeffs, planning_horizon_, num_legs_,
@@ -745,7 +745,7 @@ std::vector<double> ConvexMpc::ComputeContactForces(
       settings.adaptive_rho_interval = 25;
       settings.eps_abs = 1e-3;
       settings.eps_rel = 1e-3;
-      
+
       assert(p_mat_.cols()== num_variables);
       assert(p_mat_.rows()== num_variables);
       assert(q_vec_.size()== num_variables);
@@ -788,7 +788,7 @@ std::vector<double> ConvexMpc::ComputeContactForces(
       data.u = clipped_upper_bounds.data();
 
       const int return_code = 0;
-      
+
       if (workspace_==0) {
           osqp_setup(&workspace_, &data, &settings);
           initial_run_ = false;
@@ -799,7 +799,7 @@ std::vector<double> ConvexMpc::ComputeContactForces(
               num_legs_, &constraint_);
           foot_friction_coeff_ << foot_friction_coeffs[0], foot_friction_coeffs[1],
               foot_friction_coeffs[2], foot_friction_coeffs[3];
-              
+
           c_int nnzP = objective_matrix_upper_triangle.nonZeros();
 
           c_int nnzA = constraint_matrix.nonZeros();
@@ -807,7 +807,7 @@ std::vector<double> ConvexMpc::ComputeContactForces(
           int return_code = osqp_update_P_A(
               workspace_, objective_matrix_upper_triangle.valuePtr(), OSQP_NULL, nnzP,
               constraint_matrix.valuePtr(), OSQP_NULL, nnzA);
-          
+
           return_code =
               osqp_update_lin_cost(workspace_, objective_vector.data());
 
@@ -821,9 +821,9 @@ std::vector<double> ConvexMpc::ComputeContactForces(
               return error_result;
           }
       }
-      
+
       Map<VectorXd> solution(qp_solution_.data(), qp_solution_.size());
-      
+
       if (workspace_->info->status_val== OSQP_SOLVED) {
           solution = -Map<const VectorXd>(workspace_->solution->x, workspace_->data->n);
       }
@@ -831,11 +831,11 @@ std::vector<double> ConvexMpc::ComputeContactForces(
           //LOG(WARNING) << "QP does not converge";
           return error_result;
       }
-      
+
       return qp_solution_;
     } else
     {
-      
+
       // Solve the QP Problem using qpOASES
     UpdateConstraintsMatrix(foot_friction_coeffs, planning_horizon_, num_legs_,
                             &constraint_);
@@ -929,27 +929,27 @@ PYBIND11_MODULE(mpc_osqp, m) {
 
     )pbdoc";
 
-      
+
    py::enum_<QPSolverName>(m, "QPSolverName")
       .value("OSQP", OSQP, "OSQP")
       .value("QPOASES", QPOASES, "QPOASES")
       .export_values();
-      
+
   py::class_<ConvexMpc>(m, "ConvexMpc")
       .def(py::init<double, const std::vector<double>&, int,
           int , double ,const std::vector<double>&, double,QPSolverName>())
       .def("compute_contact_forces", &ConvexMpc::ComputeContactForces)
       .def("reset_solver", &ConvexMpc::ResetSolver     );
 
- 
+
 
 #ifdef VERSION_INFO
   m.attr("__version__") = VERSION_INFO;
 #else
   m.attr("__version__") = "dev";
 #endif
-  
+
   m.attr("TEST") = py::int_(int(42));
 
-  
+
 }

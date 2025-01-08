@@ -5,13 +5,16 @@ URDF_NAME = "a1/a1.urdf"
 START_POS = [0, 0, 0.32]
 
 
-MPC_BODY_MASS = 108 / 9.8
-MPC_BODY_INERTIA = np.array(
-      (0.017, 0, 0, 0, 0.057, 0, 0, 0, 0.064)) * 0.1#* 2
-MPC_BODY_HEIGHT = 0.24
+MPC_BODY_MASS = 110 / 9.8
+MPC_BODY_INERTIA  = np.array(
+          (0.017, 0, 0, 0, 0.057, 0, 0, 0, 0.064)) * 10.
+
+#  = np.array(
+#       (0.017, 0, 0, 0, 0.057, 0, 0, 0, 0.064)) * 0.1#* 2
+MPC_BODY_HEIGHT = 0.30
 MPC_VELOCITY_MULTIPLIER = 0.5
-  
-ACTION_REPEAT = 5
+
+ACTION_REPEAT = 1
 
 
 
@@ -72,7 +75,7 @@ MOTOR_NAMES = [
 ]
 
 #Use a PD controller
-MOTOR_CONTROL_POSITION = 1 
+MOTOR_CONTROL_POSITION = 1
 # Apply motor torques directly.
 MOTOR_CONTROL_TORQUE = 2
 # Apply a tuple (q, qdot, kp, kd, tau) for each motor. Here q, qdot are motor
@@ -224,7 +227,7 @@ class A1MotorModel(object):
 
     return motor_torques, motor_torques
 
-  
+
 
 class SimpleRobot(object):
   def __init__(self, pybullet_client, robot_uid, simulation_time_step):
@@ -233,12 +236,13 @@ class SimpleRobot(object):
     self.quadruped = robot_uid
     self.num_legs = NUM_LEGS
     self.num_motors = NUM_MOTORS
+    self._step_counter = 0
+    self._last_timestamp = 0
     self._BuildJointNameToIdDict()
     self._BuildUrdfIds()
     self._BuildMotorIdList()
     self.ResetPose()
     self._motor_enabled_list = [True] * self.num_motors
-    self._step_counter = 0
     self._state_action_counter = 0
     self._motor_offset= np.array([0]*12)
     self._motor_direction= np.array([1,  1,  1,  1,  1,  1, 1,  1,  1,  1,  1,  1])
@@ -247,7 +251,10 @@ class SimpleRobot(object):
     self._kd = self.GetMotorVelocityGains()
     self._motor_model = A1MotorModel(kp=self._kp, kd=self._kd, motor_control_mode=MOTOR_CONTROL_HYBRID)
     self._SettleDownForReset(reset_time=1.0)
-    self._step_counter = 0
+    self._last_timestamp = 0
+    self._foot_contact_history = self.GetFootPositionsInBaseFrame().copy()
+    self._foot_contact_history[:, 2] = - MPC_BODY_HEIGHT
+    self.MPC_BODY_HEIGHT = MPC_BODY_HEIGHT
 
   def ResetPose(self):
     for name in self._joint_name_to_id:
@@ -270,7 +277,10 @@ class SimpleRobot(object):
                          name)
       self.pybullet_client.resetJointState(
           self.quadruped, self._joint_name_to_id[name], angle, targetVelocity=0)
-          
+
+      # self._last_timestamp = self.GetTimeSinceReset()
+      # self._step_counter = 0
+
 
   def _SettleDownForReset(self, reset_time):
     self.ReceiveObservation()
@@ -280,27 +290,27 @@ class SimpleRobot(object):
       self._StepInternal(
           INIT_MOTOR_ANGLES,
           motor_control_mode=MOTOR_CONTROL_POSITION)
-        
+
   def _GetMotorNames(self):
     return MOTOR_NAMES
-    
+
   def _BuildMotorIdList(self):
     self._motor_id_list = [
         self._joint_name_to_id[motor_name]
         for motor_name in self._GetMotorNames()
     ]
-  
+
   def GetMotorPositionGains(self):
      return np.array([ABDUCTION_P_GAIN, HIP_P_GAIN, KNEE_P_GAIN, ABDUCTION_P_GAIN,
         HIP_P_GAIN, KNEE_P_GAIN, ABDUCTION_P_GAIN, HIP_P_GAIN, KNEE_P_GAIN,
         ABDUCTION_P_GAIN, HIP_P_GAIN, KNEE_P_GAIN])
-    
+
   def GetMotorVelocityGains(self):
     return np.array([ABDUCTION_D_GAIN, HIP_D_GAIN, KNEE_D_GAIN, ABDUCTION_D_GAIN,
         HIP_D_GAIN, KNEE_D_GAIN, ABDUCTION_D_GAIN, HIP_D_GAIN, KNEE_D_GAIN,
         ABDUCTION_D_GAIN, HIP_D_GAIN, KNEE_D_GAIN])
-    
-    
+
+
   def compute_jacobian(self, robot, link_id):
     """Computes the Jacobian matrix for the given link.
 
@@ -322,7 +332,7 @@ class SimpleRobot(object):
     jacobian = np.array(jv)
     assert jacobian.shape[0] == 3
     return jacobian
-  
+
   def ComputeJacobian(self, leg_id):
     """Compute the Jacobian for a given leg."""
     # Does not work for Minitaur which has the four bar mechanism for now.
@@ -331,7 +341,7 @@ class SimpleRobot(object):
         robot=self,
         link_id=self._foot_link_ids[leg_id],
     )
-    
+
   def MapContactForceToJointTorques(self, leg_id, contact_force):
     """Maps the foot contact force to the leg joint torques."""
     jv = self.ComputeJacobian(leg_id)
@@ -345,7 +355,7 @@ class SimpleRobot(object):
           com_dof + joint_id] * self._motor_direction[joint_id]
 
     return motor_torques
-    
+
   def GetBaseRollPitchYaw(self):
     """Get minitaur's base orientation in euler angle in the world frame.
 
@@ -355,8 +365,8 @@ class SimpleRobot(object):
     orientation = self.GetTrueBaseOrientation()
     roll_pitch_yaw = self.pybullet_client.getEulerFromQuaternion(orientation)
     return np.asarray(roll_pitch_yaw)
-    
-  
+
+
   def joint_angles_from_link_position(
   self,
     robot,
@@ -402,7 +412,7 @@ class SimpleRobot(object):
     # Extract the relevant joint angles.
     joint_angles = [all_joint_angles[i] for i in joint_ids]
     return joint_angles
-  
+
   def ComputeMotorAnglesFromFootLocalPosition(self, leg_id,
                                               foot_local_position):
     """Use IK to compute the motor angles, given the foot link's local position.
@@ -441,13 +451,13 @@ class SimpleRobot(object):
     # Return the joing index (the same as when calling GetMotorAngles) as well
     # as the angles.
     return joint_position_idxs, joint_angles.tolist()
-    
+
   def GetTimeSinceReset(self):
     return self._step_counter * self.time_step
-    
+
   def GetHipPositionsInBaseFrame(self):
     return _DEFAULT_HIP_POSITIONS
-    
+
   def GetBaseVelocity(self):
     """Get the linear velocity of minitaur's base.
 
@@ -456,12 +466,15 @@ class SimpleRobot(object):
     """
     velocity, _ = self.pybullet_client.getBaseVelocity(self.quadruped)
     return velocity
+  def GetTrueBasePosition(self):
+      return np.array(
+        self.pybullet_client.getBasePositionAndOrientation(self.quadruped)[0])
 
   def GetTrueBaseOrientation(self):
-    pos,orn = self.pybullet_client.getBasePositionAndOrientation(
+    pos, orn = self.pybullet_client.getBasePositionAndOrientation(
         self.quadruped)
-    return orn
-    
+    return np.array(orn)
+
   def TransformAngularVelocityToLocalFrame(self, angular_velocity, orientation):
     """Transform the angular velocity from world frame to robot's frame.
 
@@ -483,7 +496,7 @@ class SimpleRobot(object):
         [0, 0, 0], orientation_inversed, angular_velocity,
         self.pybullet_client.getQuaternionFromEuler([0, 0, 0]))
     return np.asarray(relative_velocity)
-    
+
   def GetBaseRollPitchYawRate(self):
     """Get the rate of orientation change of the minitaur's base in euler angle.
 
@@ -494,7 +507,7 @@ class SimpleRobot(object):
     orientation = self.GetTrueBaseOrientation()
     return self.TransformAngularVelocityToLocalFrame(angular_velocity,
                                                      orientation)
-                              
+
   def GetFootContacts(self):
     all_contacts = self.pybullet_client.getContactPoints(bodyA=self.quadruped)
 
@@ -510,7 +523,7 @@ class SimpleRobot(object):
       except ValueError:
         continue
     return contacts
-    
+
   def GetTrueMotorAngles(self):
     """Gets the eight motor angles at the current moment, mapped to [-pi, pi].
 
@@ -518,7 +531,7 @@ class SimpleRobot(object):
       Motor angles, mapped to [-pi, pi].
     """
     self.ReceiveObservation()
-    
+
     motor_angles = [state[0] for state in self._joint_states]
     motor_angles = np.multiply(
         np.asarray(motor_angles) - np.asarray(self._motor_offset),
@@ -545,7 +558,7 @@ class SimpleRobot(object):
 
     motor_velocities = np.multiply(motor_velocities, self._motor_direction)
     return motor_velocities
-    
+
 
   def GetTrueObservation(self):
     self.ReceiveObservation()
@@ -556,7 +569,7 @@ class SimpleRobot(object):
     observation.extend(self.GetTrueBaseOrientation())
     observation.extend(self.GetTrueBaseRollPitchYawRate())
     return observation
-    
+
   def ApplyAction(self, motor_commands, motor_control_mode):
     """Apply the motor commands using the motor model.
 
@@ -569,7 +582,7 @@ class SimpleRobot(object):
     qdot_true = self.GetTrueMotorVelocities()
     actual_torque, observed_torque = self._motor_model.convert_to_torque(
         motor_commands, q, qdot, qdot_true, motor_control_mode)
-    
+
     # The torque is already in the observation space because we use
     # GetMotorAngles and GetMotorVelocities.
     self._observed_motor_torques = observed_torque
@@ -597,8 +610,8 @@ class SimpleRobot(object):
         jointIndices=motor_ids,
         controlMode=self.pybullet_client.TORQUE_CONTROL,
         forces=torques)
-        
-  def ReceiveObservation(self):    
+
+  def ReceiveObservation(self):
     self._joint_states = self.pybullet_client.getJointStates(self.quadruped, self._motor_id_list)
 
   def _StepInternal(self, action, motor_control_mode):
@@ -606,25 +619,44 @@ class SimpleRobot(object):
     self.pybullet_client.stepSimulation()
     self.ReceiveObservation()
     self._state_action_counter += 1
-    
+
+  def UpdateContactHistory(self):
+    dt = self.GetTimeSinceReset() - self._last_timestamp
+    self._last_timestamp = self.GetTimeSinceReset()
+    base_orientation = self.GetTrueBaseOrientation()
+    rot_mat = self.pybullet_client.getMatrixFromQuaternion(base_orientation)
+    rot_mat = np.array(rot_mat).reshape((3, 3))
+    base_vel_body_frame = rot_mat.T.dot(self.GetBaseVelocity())
+
+    foot_contacts = self.GetFootContacts().copy()
+    foot_positions = self.GetFootPositionsInBaseFrame().copy()
+
+    for leg_id in range(4):
+      if foot_contacts[leg_id]:
+        self._foot_contact_history[leg_id] = foot_positions[leg_id]
+      else:
+        self._foot_contact_history[leg_id] -= base_vel_body_frame * dt
+
   def Step(self, action):
     """Steps simulation."""
     #if self._enable_action_filter:
     #  action = self._FilterAction(action)
-
     for i in range(ACTION_REPEAT):
       #proc_action = self.ProcessAction(action, i)
       proc_action = action
       self._StepInternal(proc_action, motor_control_mode=MOTOR_CONTROL_HYBRID)
+      self.UpdateContactHistory()
       self._step_counter += 1
-    
+
+
+
   def _BuildJointNameToIdDict(self):
     num_joints = self.pybullet_client.getNumJoints(self.quadruped)
     self._joint_name_to_id = {}
     for i in range(num_joints):
       joint_info = self.pybullet_client.getJointInfo(self.quadruped, i)
       self._joint_name_to_id[joint_info[1].decode("UTF-8")] = joint_info[0]
-      
+
   def _BuildUrdfIds(self):
     """Build the link Ids from its name in the URDF file.
 
@@ -662,7 +694,7 @@ class SimpleRobot(object):
     self._leg_link_ids.extend(self._lower_link_ids)
     self._leg_link_ids.extend(self._foot_link_ids)
 
-    
+
     #assert len(self._foot_link_ids) == NUM_LEGS
     self._hip_link_ids.sort()
     self._motor_link_ids.sort()
@@ -672,7 +704,7 @@ class SimpleRobot(object):
 
     return
 
-  def link_position_in_base_frame( self,   link_id ):
+  def link_position_in_base_frame(self,link_id):
     """Computes the link's local position in the robot frame.
 
     Args:
@@ -698,7 +730,7 @@ class SimpleRobot(object):
   def GetFootLinkIDs(self):
     """Get list of IDs for all foot links."""
     return self._foot_link_ids
-    
+
   def GetFootPositionsInBaseFrame(self):
     """Get the robot's foot position in the base frame."""
     assert len(self._foot_link_ids) == self.num_legs
@@ -708,4 +740,3 @@ class SimpleRobot(object):
           self.link_position_in_base_frame(link_id=foot_id)
           )
     return np.array(foot_positions)
-    

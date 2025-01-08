@@ -71,12 +71,12 @@ def _setup_controller(robot):
   desired_speed = (0, 0)
   desired_twisting_speed = 0
 
-  gait_generator = openloop_gait_generator.OpenloopGaitGenerator(
-      robot,
-      stance_duration=_STANCE_DURATION_SECONDS,
-      duty_factor=_DUTY_FACTOR,
-      initial_leg_phase=_INIT_PHASE_FULL_CYCLE,
-      initial_leg_state=_INIT_LEG_STATE)
+  # gait_generator = openloop_gait_generator.OpenloopGaitGenerator(
+  #     robot,
+  #     stance_duration=_STANCE_DURATION_SECONDS,
+  #     duty_factor=_DUTY_FACTOR,
+  #     initial_leg_phase=_INIT_PHASE_FULL_CYCLE,
+  #     initial_leg_state=_INIT_LEG_STATE)
   gait_generator = offset_gait_generator.OffsetGaitGenerator(
         robot, [0., np.pi, np.pi, 0.])
   state_estimator = st_estimator.COMVelocityEstimator(robot, velocity_window_size=60, ground_normal_window_size=10)
@@ -133,7 +133,7 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
   p.setPhysicsEngineParameter(enableConeFriction=0)
   p.setAdditionalSearchPath(pd.getDataPath())
 
-  world_class=WORLD_NAME_TO_CLASS_MAP["slope"]
+  world_class=WORLD_NAME_TO_CLASS_MAP["plane"]
   world = world_class(p)
   world.build_world()
 
@@ -175,9 +175,9 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
     )
     #
     # time.sleep(0.003)
-    print("debug")
-    print("linear vel",robot.GetBaseVelocity())
-    print("angle vel", robot.GetBaseRollPitchYawRate())
+    # print("debug")
+    # print("linear vel",robot.GetBaseVelocity())
+    # print("angle vel", robot.GetBaseRollPitchYawRate())
     current_time = robot.GetTimeSinceReset()
     p.submitProfileTiming()
 

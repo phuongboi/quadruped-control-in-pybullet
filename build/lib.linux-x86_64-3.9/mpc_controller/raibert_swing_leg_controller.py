@@ -12,7 +12,6 @@ import numpy as np
 from typing import Any, Mapping, Sequence, Tuple
 
 from mpc_controller import gait_generator as gait_generator_lib
-from mpc_controller import leg_controller
 
 # The position correction coefficients in Raibert's formula.
 _KP = np.array([0.01, 0.01, 0.01]) * 3
@@ -48,7 +47,8 @@ def _gen_parabola(phase: float, start: float, mid: float, end: float) -> float:
 
 
 def _gen_swing_foot_trajectory(input_phase: float, start_pos: Sequence[float],
-                               end_pos: Sequence[float]) -> Tuple[float]:
+                               end_pos: Sequence[float],
+                               foot_clearance: float) -> Tuple[float]:
   """Generates the swing trajectory using a parabola.
 
   Args:
@@ -75,15 +75,15 @@ def _gen_swing_foot_trajectory(input_phase: float, start_pos: Sequence[float],
 
   x = (1 - phase) * start_pos[0] + phase * end_pos[0]
   y = (1 - phase) * start_pos[1] + phase * end_pos[1]
-  max_clearance = 0.1
-  mid = max(end_pos[2], start_pos[2]) + max_clearance
+
+  mid = max(end_pos[2], start_pos[2]) + foot_clearance
   z = _gen_parabola(phase, start_pos[2], mid, end_pos[2])
 
   # PyType detects the wrong return type here.
   return (x, y, z)  # pytype: disable=bad-return-type
 
 
-class RaibertSwingLegController(leg_controller.LegController):
+class RaibertSwingLegController(object):
   """Controls the swing leg position using Raibert's formula.
 
   For details, please refer to chapter 2 in "Legged robbots that balance" by
@@ -119,8 +119,8 @@ class RaibertSwingLegController(leg_controller.LegController):
     self._last_leg_state = gait_generator.desired_leg_state
     self.desired_speed = np.array((desired_speed[0], desired_speed[1], 0))
     self.desired_twisting_speed = desired_twisting_speed
-    self._desired_height = np.array((0, 0, desired_height - foot_clearance))
-
+    self._desired_height = np.array((0, 0, desired_height - _FOOT_CLEARANCE_M))
+    self._foot_clearance = foot_clearance
     self._joint_angles = None
     self._phase_switch_foot_local_position = None
     self.reset(0)
@@ -186,7 +186,7 @@ class RaibertSwingLegController(leg_controller.LegController):
       ) - self._desired_height + np.array((hip_offset[0], hip_offset[1], 0))
       foot_position = _gen_swing_foot_trajectory(
           self._gait_generator.normalized_phase[leg_id],
-          self._phase_switch_foot_local_position[leg_id], foot_target_position)
+          self._phase_switch_foot_local_position[leg_id], foot_target_position, self._foot_clearance)
       joint_ids, joint_angles = (
           self._robot.ComputeMotorAnglesFromFootLocalPosition(
               leg_id, foot_position))
@@ -203,6 +203,6 @@ class RaibertSwingLegController(leg_controller.LegController):
           leg_id] == gait_generator_lib.LegState.SWING:
         # This is a hybrid action for PD control.
         action[joint_id] = (joint_angle_leg_id[0], kps[joint_id], 0,
-                            kds[joint_id], 0)
+                            kds[joint_id], 0) # position kp velocity kd extra torque
 
     return action

@@ -27,8 +27,8 @@ _FORCE_DIMENSION = 3
 # _MPC_WEIGHTS = (5, 5, 0.2, 0, 0, 10, 0.5, 0.5, 0.2, 0.2, 0.2, 0.1, 0)
 # This worked well for in-place stepping in the real robot.
 # _MPC_WEIGHTS = (5, 5, 0.2, 0, 0, 10, 0., 0., 0.2, 1., 1., 0., 0)
-# _MPC_WEIGHTS = (5, 5, 0.2, 0, 0, 10, 0., 0., 1., 1., 1., 0., 0)
-_MPC_WEIGHTS = (1., 1., 0, 0, 0, 10, 0., 0., .1, .1, .1, .0, 0)
+_MPC_WEIGHTS = (5, 5, 0.2, 0, 0, 10, 0., 0., 1., 1., 1., 0., 0)
+# _MPC_WEIGHTS = (1., 1., 0, 0, 0, 10, 0., 0., .1, .1, .1, .0, 0)
 _PLANNING_HORIZON_STEPS = 10
 _PLANNING_TIMESTEP = 0.025
 
@@ -140,21 +140,20 @@ class TorqueStanceLegController(object):
     # print("Com RPY Rate: {}".format(self._robot.GetBaseRollPitchYawRate()))
 
     p.submitProfileTiming("predicted_contact_forces")
-    print(com_position)
     predicted_contact_forces = self._cpp_mpc.compute_contact_forces(
         com_position,  #com_position ???
         np.asarray(self._state_estimator.com_velocity_ground_frame,
                    dtype=np.float64),  #com_velocity
         np.array(com_roll_pitch_yaw, dtype=np.float64),  #com_roll_pitch_yaw
-        # gravity_projection_vec,
+        gravity_projection_vec,
         # Angular velocity in the yaw aligned world frame is actually different
         # from rpy rate. We use it here as a simple approximation.
         np.asarray(self._robot.GetBaseRollPitchYawRate(),
                    dtype=np.float64),  #com_angular_velocity
         # np.asarray(self._state_estimator.com_rpy_rate_ground_frame,
         # dtype=np.float64),  #com_angular_velocity
-        foot_contact_state,  #foot_contact_states
-        # np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS).flatten(),
+        # foot_contact_state,  #foot_contact_states
+        np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS).flatten(),
         np.array(self._robot.GetFootPositionsInBaseFrame().flatten(),
                  dtype=np.float64),  #foot_positions_base_frame
         self._friction_coeffs,  #foot_friction_coeffs
@@ -163,7 +162,6 @@ class TorqueStanceLegController(object):
         desired_com_roll_pitch_yaw,  #desired_com_roll_pitch_yaw
         desired_com_angular_velocity  #desired_com_angular_velocity
     )
-
     p.submitProfileTiming()
     # sol = np.array(predicted_contact_forces).reshape((-1, 12))
     # x_dim = np.array([0, 3, 6, 9])

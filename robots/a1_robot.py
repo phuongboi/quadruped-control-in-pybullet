@@ -278,8 +278,8 @@ class SimpleRobot(object):
       self.pybullet_client.resetJointState(
           self.quadruped, self._joint_name_to_id[name], angle, targetVelocity=0)
 
-      self._last_timestamp = self.GetTimeSinceReset()
-      self._step_counter = 0
+      # self._last_timestamp = self.GetTimeSinceReset()
+      # self._step_counter = 0
 
 
   def _SettleDownForReset(self, reset_time):
@@ -641,13 +641,13 @@ class SimpleRobot(object):
     """Steps simulation."""
     #if self._enable_action_filter:
     #  action = self._FilterAction(action)
-
     for i in range(ACTION_REPEAT):
       #proc_action = self.ProcessAction(action, i)
       proc_action = action
       self._StepInternal(proc_action, motor_control_mode=MOTOR_CONTROL_HYBRID)
       self.UpdateContactHistory()
       self._step_counter += 1
+
 
 
   def _BuildJointNameToIdDict(self):

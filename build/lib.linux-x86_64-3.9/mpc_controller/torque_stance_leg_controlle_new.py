@@ -120,8 +120,13 @@ class TorqueStanceLegController(object):
          for leg_state in self._gait_generator.leg_state],
         dtype=np.int32)
 
-    # com_position = np.array(self._robot.base_position)
+    # com_position = np.array(self._robot.GetTrueBasePosition())
     com_position = np.array(self._state_estimator.com_position_ground_frame)
+
+
+    if self._robot._step_counter <= 1:
+        print(com_position)
+        print("_----------------------------------------")
 
     # We use the body yaw aligned world frame for MPC computation.
     # com_roll_pitch_yaw = np.array(self._robot.GetBaseRollPitchYaw(),
@@ -134,27 +139,37 @@ class TorqueStanceLegController(object):
     com_roll_pitch_yaw[2] = 0
     gravity_projection_vec = np.array(
     self._state_estimator.gravity_projection_vector)
+
     #predicted_contact_forces=[0]*self._num_legs*_FORCE_DIMENSION
     # print("Com Vel: {}".format(self._state_estimator.com_velocity_body_frame))
     # print("Com RPY: {}".format(self._robot.GetBaseRollPitchYawRate()))
     # print("Com RPY Rate: {}".format(self._robot.GetBaseRollPitchYawRate()))
+    print("Com RPY: {}".format(com_roll_pitch_yaw))
+    print("Com pos: {}".format(com_position))
+    print("Com Vel: {}".format(
+            self._state_estimator.com_velocity_ground_frame))
+    print("Ground orientation_world_frame: {}".format(
+        p.getEulerFromQuaternion(
+            self._state_estimator.ground_orientation_world_frame)))
+    print("Gravity projection: {}".format(gravity_projection_vec))
+    print("Com RPY Rate: {}".format(self._robot.GetBaseRollPitchYawRate()))
 
     p.submitProfileTiming("predicted_contact_forces")
-    print(com_position)
+
     predicted_contact_forces = self._cpp_mpc.compute_contact_forces(
         com_position,  #com_position ???
         np.asarray(self._state_estimator.com_velocity_ground_frame,
                    dtype=np.float64),  #com_velocity
         np.array(com_roll_pitch_yaw, dtype=np.float64),  #com_roll_pitch_yaw
-        # gravity_projection_vec,
+        gravity_projection_vec,
         # Angular velocity in the yaw aligned world frame is actually different
         # from rpy rate. We use it here as a simple approximation.
         np.asarray(self._robot.GetBaseRollPitchYawRate(),
                    dtype=np.float64),  #com_angular_velocity
         # np.asarray(self._state_estimator.com_rpy_rate_ground_frame,
         # dtype=np.float64),  #com_angular_velocity
-        foot_contact_state,  #foot_contact_states
-        # np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS).flatten(),
+        # foot_contact_state,  #foot_contact_states
+        np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS).flatten(),
         np.array(self._robot.GetFootPositionsInBaseFrame().flatten(),
                  dtype=np.float64),  #foot_positions_base_frame
         self._friction_coeffs,  #foot_friction_coeffs
@@ -163,7 +178,6 @@ class TorqueStanceLegController(object):
         desired_com_roll_pitch_yaw,  #desired_com_roll_pitch_yaw
         desired_com_angular_velocity  #desired_com_angular_velocity
     )
-
     p.submitProfileTiming()
     # sol = np.array(predicted_contact_forces).reshape((-1, 12))
     # x_dim = np.array([0, 3, 6, 9])

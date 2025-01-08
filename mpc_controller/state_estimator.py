@@ -115,10 +115,10 @@ class COMVelocityEstimator(object):
      https://ieeexplore.ieee.org/document/7354099
      """
       contact_foot_positions = np.array(contact_foot_positions)
-      normal_vec = np.linalg.lstsq(contact_foot_positions, np.ones(4))[0]
-      normal_vec = normal_vec / np.linalg.norm(normal_vec)
+      normal_vec = np.linalg.lstsq(contact_foot_positions, np.ones(4), rcond=None)[0]
+      normal_vec /= np.linalg.norm(normal_vec)
       if normal_vec[2] < 0:
-          normal_vec = normal_vec
+          normal_vec = -normal_vec
       return normal_vec
 
   def update(self, current_time):
@@ -218,6 +218,7 @@ class COMVelocityEstimator(object):
   @property
   def ground_orientation_robot_frame(self):
     normal_vec = self.ground_normal
+    print("normal vector", normal_vec)
     axis = np.array([-normal_vec[1], normal_vec[0], 0])
     axis /= np.linalg.norm(axis) #
     angle = np.arccos(normal_vec[2])
