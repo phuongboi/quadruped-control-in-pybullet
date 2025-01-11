@@ -14,7 +14,7 @@ from typing import Any, Mapping, Sequence, Tuple
 from mpc_controller import gait_generator as gait_generator_lib
 
 # The position correction coefficients in Raibert's formula.
-_KP = np.array([0.01, 0.01, 0.01]) * 3
+_KP = np.array([0.01, 0.01, 0.01]) * 0
 # At the end of swing, we leave a small clearance to prevent unexpected foot
 # collision.
 _FOOT_CLEARANCE_M = 0.01
@@ -165,7 +165,8 @@ class RaibertSwingLegController(object):
 
     for leg_id, leg_state in enumerate(self._gait_generator.leg_state):
       if leg_state in (gait_generator_lib.LegState.STANCE,
-                       gait_generator_lib.LegState.EARLY_CONTACT):
+                       gait_generator_lib.LegState.EARLY_CONTACT,
+                       gait_generator_lib.LegState.LOSE_CONTACT):
         continue
 
       # For now we did not consider the body pitch/roll and all calculation is
@@ -183,7 +184,20 @@ class RaibertSwingLegController(object):
           hip_horizontal_velocity *
           self._gait_generator.stance_duration[leg_id] / 2 - _KP *
           (target_hip_horizontal_velocity - hip_horizontal_velocity)
-      ) - self._desired_height + np.array((hip_offset[0], hip_offset[1], 0))
+      )
+
+      foot_target_position = np.clip(foot_target_position,
+                               [-0.15, -0.1, -0.05], [0.15, 0.1, 0.05])
+      foot_target_position = foot_target_position - self._desired_height + np.array((hip_offset[0], hip_offset[1], 0))
+      # print("foot target position", foot_target_position)
+            # Compute target position compensation due to slope
+      gravity_projection_vector = self._state_estimator.gravity_projection_vector
+      # print("gravity projection vector", gravity_projection_vector)
+      multiplier = -self._desired_height[
+          2] / gravity_projection_vector[2]
+      foot_target_position[:2] += gravity_projection_vector[:2] * multiplier
+      foot_target_position[2] -= 0.02
+      print("foot target position", foot_target_position)
       foot_position = _gen_swing_foot_trajectory(
           self._gait_generator.normalized_phase[leg_id],
           self._phase_switch_foot_local_position[leg_id], foot_target_position, self._foot_clearance)

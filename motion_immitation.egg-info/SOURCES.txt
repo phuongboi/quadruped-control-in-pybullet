@@ -13,7 +13,7 @@ mpc_controller/openloop_gait_generator.py
 mpc_controller/raibert_swing_leg_controller.py
 mpc_controller/state_estimator.py
 mpc_controller/torque_stance_leg_controller.py
-mpc_controller/torque_stance_leg_controller_new.py
+mpc_controller/torque_stance_leg_controller_old.py
 robots/__init__.py
 robots/a1_robot.py
 third_party/osqp/lin_sys/direct/qdldl/qdldl_interface.c

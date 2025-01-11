@@ -133,7 +133,7 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
   p.setPhysicsEngineParameter(enableConeFriction=0)
   p.setAdditionalSearchPath(pd.getDataPath())
 
-  world_class=WORLD_NAME_TO_CLASS_MAP["plane"]
+  world_class=WORLD_NAME_TO_CLASS_MAP["slope"]
   world = world_class(p)
   world.build_world()
 
