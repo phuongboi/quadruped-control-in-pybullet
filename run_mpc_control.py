@@ -164,6 +164,7 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
     hybrid_action, info = controller.get_action()
 
     robot.Step(hybrid_action)
+    time.sleep(0.001)
 
     # if record_video:
     #   p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING,1)
