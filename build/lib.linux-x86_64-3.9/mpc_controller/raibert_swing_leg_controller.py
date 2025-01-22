@@ -14,7 +14,7 @@ from typing import Any, Mapping, Sequence, Tuple
 from mpc_controller import gait_generator as gait_generator_lib
 
 # The position correction coefficients in Raibert's formula.
-_KP = np.array([0.01, 0.01, 0.01]) * 3
+_KP = np.array([0.01, 0.01, 0.01]) * 0
 # At the end of swing, we leave a small clearance to prevent unexpected foot
 # collision.
 _FOOT_CLEARANCE_M = 0.01
@@ -99,7 +99,8 @@ class RaibertSwingLegController(object):
       desired_speed: Tuple[float, float],
       desired_twisting_speed: float,
       desired_height: float,
-      foot_clearance: float,
+      foot_height: float,
+      foot_landing_clearance: float
   ):
     """Initializes the class.
 
@@ -119,8 +120,9 @@ class RaibertSwingLegController(object):
     self._last_leg_state = gait_generator.desired_leg_state
     self.desired_speed = np.array((desired_speed[0], desired_speed[1], 0))
     self.desired_twisting_speed = desired_twisting_speed
-    self._desired_height = np.array((0, 0, desired_height - _FOOT_CLEARANCE_M))
-    self._foot_clearance = foot_clearance
+    self._desired_height = desired_height
+    self._desired_landing_height = np.array((0, 0, desired_height - foot_landing_clearance))
+    self._foot_height = foot_height
     self._joint_angles = None
     self._phase_switch_foot_local_position = None
     self.reset(0)
@@ -165,7 +167,8 @@ class RaibertSwingLegController(object):
 
     for leg_id, leg_state in enumerate(self._gait_generator.leg_state):
       if leg_state in (gait_generator_lib.LegState.STANCE,
-                       gait_generator_lib.LegState.EARLY_CONTACT):
+                       gait_generator_lib.LegState.EARLY_CONTACT,
+                       gait_generator_lib.LegState.LOSE_CONTACT):
         continue
 
       # For now we did not consider the body pitch/roll and all calculation is
@@ -174,19 +177,29 @@ class RaibertSwingLegController(object):
       hip_offset = hip_positions[leg_id]
       twisting_vector = np.array((-hip_offset[1], hip_offset[0], 0))
       hip_horizontal_velocity = com_velocity + yaw_dot * twisting_vector
-      # print("Leg: {}, ComVel: {}, Yaw_dot: {}".format(leg_id, com_velocity,
-      #                                                 yaw_dot))
-      # print(hip_horizontal_velocity)
+
       target_hip_horizontal_velocity = (
           self.desired_speed + self.desired_twisting_speed * twisting_vector)
+
       foot_target_position = (
           hip_horizontal_velocity *
           self._gait_generator.stance_duration[leg_id] / 2 - _KP *
           (target_hip_horizontal_velocity - hip_horizontal_velocity)
-      ) - self._desired_height + np.array((hip_offset[0], hip_offset[1], 0))
+      )
+
+      foot_target_position = np.clip(foot_target_position,
+                               [-0.15, -0.1, -0.05], [0.15, 0.1, 0.05])
+      foot_target_position = foot_target_position - self._desired_landing_height + np.array((hip_offset[0], hip_offset[1], 0))
+
+            # Compute target position compensation due to slope
+      gravity_projection_vector = self._state_estimator.gravity_projection_vector
+      # print("gravity projection vector", gravity_projection_vector)
+      multiplier = -self._desired_landing_height[
+          2] / gravity_projection_vector[2]
+      foot_target_position[:2] += gravity_projection_vector[:2] * multiplier
       foot_position = _gen_swing_foot_trajectory(
           self._gait_generator.normalized_phase[leg_id],
-          self._phase_switch_foot_local_position[leg_id], foot_target_position, self._foot_clearance)
+          self._phase_switch_foot_local_position[leg_id], foot_target_position, self._foot_height)
       joint_ids, joint_angles = (
           self._robot.ComputeMotorAnglesFromFootLocalPosition(
               leg_id, foot_position))

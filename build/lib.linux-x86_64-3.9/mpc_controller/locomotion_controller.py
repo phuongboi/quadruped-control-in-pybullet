@@ -76,6 +76,12 @@ class LocomotionController(object):
     self._swing_leg_controller.update(self._time_since_reset)
     self._stance_leg_controller.update(self._time_since_reset)
 
+    future_contact_estimate = self._gait_generator.get_estimated_contact_states(
+        self._stance_leg_controller._PLANNING_HORIZON_STEPS,
+        self._stance_leg_controller._PLANNING_TIMESTEP)
+    self._stance_leg_controller.update(self._time_since_reset,
+                                   future_contact_estimate)
+
   def get_action(self):
     """Returns the control ouputs (e.g. positions/torques) for all motors."""
     swing_action = self._swing_leg_controller.get_action()

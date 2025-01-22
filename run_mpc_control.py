@@ -46,25 +46,25 @@ _INIT_LEG_STATE = (
     gait_generator_lib.LegState.SWING,
 )
 # temporary not use
-# def _generate_example_linear_angular_speed(t):
-#   """Creates an example speed profile based on time for demo purpose."""
-#   vx = 0.6 * robot_sim.MPC_VELOCITY_MULTIPLIER
-#   vy = 0.2 * robot_sim.MPC_VELOCITY_MULTIPLIER
-#   wz = 0.8 * robot_sim.MPC_VELOCITY_MULTIPLIER
-#
-#   time_points = (0, 5, 10, 15, 20, 25,30)
-#   speed_points = ((0, 0, 0, 0), (0, 0, 0, wz), (vx, 0, 0, 0), (0, 0, 0, -wz), (0, -vy, 0, 0),
-#                   (0, 0, 0, 0), (0, 0, 0, wz))
-#
-#   speed = scipy.interpolate.interp1d(
-#       time_points,
-#       speed_points,
-#       kind="previous",
-#       fill_value="extrapolate",
-#       axis=0)(
-#           t)
-#
-#   return speed[0:3], speed[3]
+def _generate_example_linear_angular_speed(t):
+  """Creates an example speed profile based on time for demo purpose."""
+  vx = 0.6 * robot_sim.MPC_VELOCITY_MULTIPLIER
+  vy = 0.2 * robot_sim.MPC_VELOCITY_MULTIPLIER
+  wz = 0.8 * robot_sim.MPC_VELOCITY_MULTIPLIER
+
+  time_points = (0, 5, 10, 15, 20, 25,30)
+  speed_points = ((0, 0, 0, 0), (0, 0, 0, wz), (vx, 0, 0, 0), (0, 0, 0, -wz), (0, -vy, 0, 0),
+                  (0, 0, 0, 0), (0, 0, 0, wz))
+
+  speed = scipy.interpolate.interp1d(
+      time_points,
+      speed_points,
+      kind="previous",
+      fill_value="extrapolate",
+      axis=0)(
+          t)
+
+  return speed[0:3], speed[3]
 
 def _setup_controller(robot):
   """Demonstrates how to create a locomotion controller."""
@@ -87,7 +87,8 @@ def _setup_controller(robot):
       desired_speed=desired_speed,
       desired_twisting_speed=desired_twisting_speed,
       desired_height= robot_sim.MPC_BODY_HEIGHT,
-      foot_clearance=0.1)
+      foot_height=0.17,
+      foot_landing_clearance=-0.01)
 
   st_controller = torque_stance_leg_controller.TorqueStanceLegController(
       robot,
@@ -133,7 +134,7 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
   p.setPhysicsEngineParameter(enableConeFriction=0)
   p.setAdditionalSearchPath(pd.getDataPath())
 
-  world_class=WORLD_NAME_TO_CLASS_MAP["slope"]
+  world_class=WORLD_NAME_TO_CLASS_MAP["stair"]
   world = world_class(p)
   world.build_world()
 
@@ -155,7 +156,7 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
 
     # Updates the controller behavior parameters.
     # lin_speed, ang_speed = _generate_example_linear_angular_speed(current_time)
-    lin_speed, ang_speed = (0.3, 0., 0.), 0.
+    lin_speed, ang_speed = (0.45, 0., 0.), 0.
     _update_controller_params(controller, lin_speed, ang_speed)
 
     # Needed before every call to get_action().

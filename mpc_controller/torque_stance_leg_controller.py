@@ -185,6 +185,7 @@ class TorqueStanceLegController(object):
         desired_com_roll_pitch_yaw,  #desired_com_roll_pitch_yaw
         desired_com_angular_velocity  #desired_com_angular_velocity
     )
+
     p.submitProfileTiming()
     # sol = np.array(predicted_contact_forces).reshape((-1, 12))
     # x_dim = np.array([0, 3, 6, 9])

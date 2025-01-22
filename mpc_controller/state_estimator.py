@@ -218,7 +218,6 @@ class COMVelocityEstimator(object):
   @property
   def ground_orientation_robot_frame(self):
     normal_vec = self.ground_normal
-    # print("normal vector", normal_vec)
     axis = np.array([-normal_vec[1], normal_vec[0], 0])
     axis /= np.linalg.norm(axis) #
     angle = np.arccos(normal_vec[2])

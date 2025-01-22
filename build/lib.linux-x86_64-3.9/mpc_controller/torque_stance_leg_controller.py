@@ -52,7 +52,7 @@ class TorqueStanceLegController(object):
                           float, float] = (0.07335, 0, 0, 0, 0.25068, 0, 0, 0,
                                            0.25447),
       num_legs: int = 4,
-      friction_coeffs: Sequence[float] = (0.45, 0.45, 0.45, 0.45),
+      friction_coeffs: Sequence[float] = (0.3, 0.3, 0.3, 0.3),
       qp_solver = convex_mpc.QPOASES
   ):
     """Initializes the class.
@@ -94,15 +94,19 @@ class TorqueStanceLegController(object):
         _PLANNING_TIMESTEP,
         weights_list,
         1e-5,
-        qp_solver
-
-    )
+        qp_solver)
+    self._future_contact_estimate = np.ones((_PLANNING_HORIZON_STEPS, 4))
+    self._PLANNING_HORIZON_STEPS = _PLANNING_HORIZON_STEPS
+    self._PLANNING_TIMESTEP =_PLANNING_TIMESTEP
 
   def reset(self, current_time):
     del current_time
 
-  def update(self, current_time):
+  # def update(self, current_time):
+  #   del current_time
+  def update(self, current_time, future_contact_estimate=None):
     del current_time
+    self._future_contact_estimate = future_contact_estimate
 
   def get_action(self):
     """Computes the torque for stance legs."""
@@ -116,45 +120,63 @@ class TorqueStanceLegController(object):
     # I think we should us leg state instead of desired leg state
     foot_contact_state = np.array(
         [(leg_state in (gait_generator_lib.LegState.STANCE,
-                        gait_generator_lib.LegState.EARLY_CONTACT))
+                        gait_generator_lib.LegState.EARLY_CONTACT,
+                        gait_generator_lib.LegState.LOSE_CONTACT))
          for leg_state in self._gait_generator.leg_state],
         dtype=np.int32)
 
-    # com_position = np.array(self._robot.base_position)
+    if self._future_contact_estimate is not None:
+      contact_estimates = self._future_contact_estimate.copy()
+      contact_estimates[0] = foot_contact_state
+    else:
+      contact_estimates = np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS)
+    # com_position = np.array(self._robot.GetTrueBasePosition())
     com_position = np.array(self._state_estimator.com_position_ground_frame)
 
-    # We use the body yaw aligned world frame for MPC computation.
-    com_roll_pitch_yaw = np.array(self._robot.GetBaseRollPitchYaw(),
-                                  dtype=np.float64)
 
-    # com_roll_pitch_yaw = np.array(
-    #     p.getEulerFromQuaternion(
-    #         self._state_estimator.com_orientation_quat_ground_frame))
+
+    # We use the body yaw aligned world frame for MPC computation.
+    # com_roll_pitch_yaw = np.array(self._robot.GetBaseRollPitchYaw(),
+    #                               dtype=np.float64)
+
+    com_roll_pitch_yaw = np.array(
+        p.getEulerFromQuaternion(
+            self._state_estimator.com_orientation_quat_ground_frame))
 
     com_roll_pitch_yaw[2] = 0
     gravity_projection_vec = np.array(
     self._state_estimator.gravity_projection_vector)
+
     #predicted_contact_forces=[0]*self._num_legs*_FORCE_DIMENSION
     # print("Com Vel: {}".format(self._state_estimator.com_velocity_body_frame))
     # print("Com RPY: {}".format(self._robot.GetBaseRollPitchYawRate()))
     # print("Com RPY Rate: {}".format(self._robot.GetBaseRollPitchYawRate()))
+    # print("Com RPY: {}".format(com_roll_pitch_yaw))
+    # print("Com pos: {}".format(com_position))
+    # print("Com Vel: {}".format(
+    #         self._state_estimator.com_velocity_ground_frame))
+    # print("Ground orientation_world_frame: {}".format(
+    #     p.getEulerFromQuaternion(
+    #         self._state_estimator.ground_orientation_world_frame)))
+    # print("Gravity projection: {}".format(gravity_projection_vec))
+    # print("Com RPY Rate: {}".format(self._robot.GetBaseRollPitchYawRate()))
 
     p.submitProfileTiming("predicted_contact_forces")
-    print(com_position)
+
     predicted_contact_forces = self._cpp_mpc.compute_contact_forces(
-        [0],  #com_position ???
-        np.asarray(self._state_estimator.com_velocity_body_frame,
+        com_position,  #com_position ???
+        np.asarray(self._state_estimator.com_velocity_ground_frame,
                    dtype=np.float64),  #com_velocity
         np.array(com_roll_pitch_yaw, dtype=np.float64),  #com_roll_pitch_yaw
-        # gravity_projection_vec,
+        gravity_projection_vec,
         # Angular velocity in the yaw aligned world frame is actually different
         # from rpy rate. We use it here as a simple approximation.
         np.asarray(self._robot.GetBaseRollPitchYawRate(),
                    dtype=np.float64),  #com_angular_velocity
         # np.asarray(self._state_estimator.com_rpy_rate_ground_frame,
         # dtype=np.float64),  #com_angular_velocity
-        foot_contact_state,  #foot_contact_states
-        # np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS).flatten(),
+        # foot_contact_state,  #foot_contact_states
+        np.asarray(contact_estimates, dtype=np.float64).flatten(),  # Foot contact states
         np.array(self._robot.GetFootPositionsInBaseFrame().flatten(),
                  dtype=np.float64),  #foot_positions_base_frame
         self._friction_coeffs,  #foot_friction_coeffs
@@ -163,24 +185,7 @@ class TorqueStanceLegController(object):
         desired_com_roll_pitch_yaw,  #desired_com_roll_pitch_yaw
         desired_com_angular_velocity  #desired_com_angular_velocity
     )
-    # predicted_contact_forces = self._cpp_mpc.compute_contact_forces(
-    #     [0],  #com_position
-    #     np.asarray(self._state_estimator.com_velocity_body_frame,
-    #                dtype=np.float64),  #com_velocity
-    #     np.array(com_roll_pitch_yaw, dtype=np.float64),  #com_roll_pitch_yaw
-    #     # Angular velocity in the yaw aligned world frame is actually different
-    #     # from rpy rate. We use it here as a simple approximation.
-    #     np.asarray(self._robot.GetBaseRollPitchYawRate(),
-    #                dtype=np.float64),  #com_angular_velocity
-    #     foot_contact_state,  #foot_contact_states
-    #     np.array(self._robot.GetFootPositionsInBaseFrame().flatten(),
-    #              dtype=np.float64),  #foot_positions_base_frame
-    #     self._friction_coeffs,  #foot_friction_coeffs
-    #     desired_com_position,  #desired_com_position
-    #     desired_com_velocity,  #desired_com_velocity
-    #     desired_com_roll_pitch_yaw,  #desired_com_roll_pitch_yaw
-    #     desired_com_angular_velocity  #desired_com_angular_velocity
-    # )
+
     p.submitProfileTiming()
     # sol = np.array(predicted_contact_forces).reshape((-1, 12))
     # x_dim = np.array([0, 3, 6, 9])

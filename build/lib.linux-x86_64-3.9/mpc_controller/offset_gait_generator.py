@@ -22,7 +22,7 @@ class OffsetGaitGenerator(gait_generator.GaitGenerator):
         self.current_phase = np.zeros(4)
         self._early_touchdown_phase_threshold = early_touchdown_phase_threshold
         self._lose_contact_phase_threshold = lose_contact_phase_threshold
-        self.gait_params = [2.5, np.pi, np.pi, 0, 0.5]
+        self.gait_params = [2, np.pi, np.pi, 0, 0.5]
         self.prev_frame_robot_time = 0
         self.swing_cutoff = 2 * np.pi * 0.5
 
