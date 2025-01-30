@@ -138,7 +138,7 @@ class OpenloopGaitGenerator(gait_generator.GaitGenerator):
 
     """
     return self._normalized_phase
-
+    
   def update(self, current_time):
     contact_state = self._robot.GetFootContacts()
     for leg_id in range(self._robot.num_legs):

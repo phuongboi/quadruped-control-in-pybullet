@@ -135,8 +135,7 @@ class RaibertSwingLegController(object):
     """
     del current_time
     self._last_leg_state = self._gait_generator.desired_leg_state
-    self._phase_switch_foot_local_position = (
-        self._robot.GetFootPositionsInBaseFrame())
+    self._phase_switch_foot_local_position = (self._robot.GetFootPositionsInBaseFrame())
     self._joint_angles = {}
 
   def update(self, current_time: float) -> None:
@@ -153,10 +152,10 @@ class RaibertSwingLegController(object):
     for leg_id, state in enumerate(new_leg_state):
       if (state == gait_generator_lib.LegState.SWING
           and state != self._last_leg_state[leg_id]):
-        self._phase_switch_foot_local_position[leg_id] = (
-            self._robot.GetFootPositionsInBaseFrame()[leg_id])
+        self._phase_switch_foot_local_position[leg_id] = (self._robot.GetFootPositionsInBaseFrame()[leg_id])
 
     self._last_leg_state = copy.deepcopy(new_leg_state)
+
 
   def get_action(self) -> Mapping[Any, Any]:
     com_velocity = self._state_estimator.com_velocity_body_frame

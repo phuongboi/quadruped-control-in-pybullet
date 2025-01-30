@@ -126,8 +126,8 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
   p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)
   p.setAdditionalSearchPath(pd.getDataPath())
   p.setPhysicsEngineParameter(numSolverIterations=30) #same
-  p.setPhysicsEngineParameter(enableConeFriction=0)
-  simulation_time_step = 0.002
+  p.setPhysicsEngineParameter(enableConeFriction=1)
+  simulation_time_step = 0.0012
   p.setTimeStep(simulation_time_step)
 
   p.setGravity(0, 0, -9.8)
@@ -164,7 +164,6 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
     hybrid_action, info = controller.get_action()
 
     robot.Step(hybrid_action)
-    time.sleep(0.001)
 
     # if record_video:
     #   p.configureDebugVisualizer(p.COV_ENABLE_SINGLE_STEP_RENDERING,1)
@@ -176,10 +175,10 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
         cameraTargetPosition=robot.GetTrueBasePosition(),
     )
     #
-    # time.sleep(0.003)
-    # print("debug")
-    # print("linear vel",robot.GetBaseVelocity())
-    # print("angle vel", robot.GetBaseRollPitchYawRate())
+    # time.sleep(0.001)
+    print("debug")
+    print("linear vel",robot.GetBaseVelocity())
+    print("angle vel", robot.GetBaseRollPitchYawRate())
     current_time = robot.GetTimeSinceReset()
     p.submitProfileTiming()
 
