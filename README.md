@@ -4,4 +4,6 @@
 
 #### Using mpc control to climb a stair
 * Run `python run_mpc_control.py`
-* red
+* Result
+![alt text](https://github.com/phuongboi/quadruped-control-in-pybullet/blob/main/stair_mpc.gif)
+#### Reference
