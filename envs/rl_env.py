@@ -129,8 +129,8 @@ class RL_Env(gym.Env):
         sw_ratio = action[1] #meadn = 0.5 std =
         desired_height = action[2]
         foot_height = action[3]
-        desired_speed_offset = action[4]
-        desired_twisting_speed_offset = action[5]
+        desired_speed_offset = action[4:7]
+        desired_twisting_speed_offset = action[7]
         self._gait_generator.gait_params = [f, np.pi, np.pi, 0, sw_ratio]
         self._gait_generator.update(self._time_since_reset)
 
@@ -198,43 +198,10 @@ class RL_Env(gym.Env):
 
     def _reward_fn(self, action):
         # del action # unused
-        desired_speed = self.get_desired_speed(self._time_since_reset)[0]
+        desired_speed = (0.45, 0., 0.)
+        actual_speed = self.robot.GetBaseVelocity[0]
+        speed_penalty = (desired_speed - actual_speed)**2
 
-        actual_speed = self.robot.base_velocity[0]
+        rew = 3 - speed_penalty - stable_penalty
 
-        motor_heat = 0.3 * self.robot.motor_torques**2
-        motor_mech = self.robot.motor_torques * self.robot.motor_velocities
-
-        # Maximize over 0 since the battery can not be charged by the motor yet
-        power_penalty = np.maximum(motor_heat + motor_mech, 0)
-        power_penalty = np.sum(power_penalty)
-        if self.config.get('use_cot', False):
-          power_penalty /= np.maximum(desired_speed, 0.3)
-
-        action_norm_penalty = np.sum(np.maximum(np.abs(action[1:7]) - 0.5, 0))
-
-        alive_bonus = self.config.get('alive_bonus', 3.)
-
-        speed_penalty_type = self.config.get('speed_penalty_type',
-                                             'symmetric_square')
-        if speed_penalty_type == 'symmetric_square':
-          speed_penalty = (desired_speed - actual_speed)**2
-        elif speed_penalty_type == 'asymmetric_square':
-          speed_penalty = np.maximum(desired_speed - actual_speed, 0)**2
-        elif speed_penalty_type == 'soft_symmetric_square':
-          speed_diff = np.abs(desired_speed - actual_speed)
-          speed_penalty = np.maximum(speed_diff - 0.2, 0)**2
-        else:
-          speed_diff = np.abs(desired_speed - actual_speed) / np.maximum(
-              actual_speed, 0.3)
-          speed_diff = np.clip(speed_diff, -1, 1)
-          speed_penalty = speed_diff**2
-
-        # rew = alive_bonus - power_penalty * 0.0025 - np.maximum(
-        #     (desired_speed - actual_speed), 0
-        # )**2 - action_norm_penalty * self.config.get('action_penalty_weight', 0)
-        rew = alive_bonus - \
-            power_penalty * self.config.get('power_penalty_weight', 0.0025) - \
-            speed_penalty * self.config.get('speed_penalty_weight', 1) - \
-            action_norm_penalty * self.config.get('action_penalty_weight', 0)
     return rew
