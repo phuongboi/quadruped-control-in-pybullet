@@ -284,8 +284,8 @@ class SimpleRobot(object):
       self.pybullet_client.resetJointState(
           self.quadruped, self._joint_name_to_id[name], angle, targetVelocity=0)
 
-      # self._last_timestamp = self.GetTimeSinceReset()
-      # self._step_counter = 0
+      self._last_timestamp = self.GetTimeSinceReset()
+      self._step_counter = 0
 
 
   def _SettleDownForReset(self, reset_time):

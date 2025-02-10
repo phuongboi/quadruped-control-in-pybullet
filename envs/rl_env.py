@@ -15,6 +15,26 @@ from mpc_controller import locomotion_controller
 from robots import a1_robot as robot_sim
 from worlds import plane_world, slope_world, stair_world, uneven_world
 
+def _generate_example_linear_angular_speed(t):
+  """Creates an example speed profile based on time for demo purpose."""
+  vx = 0.6 * robot_sim.MPC_VELOCITY_MULTIPLIER
+  vy = 0.2 * robot_sim.MPC_VELOCITY_MULTIPLIER
+  wz = 0.8 * robot_sim.MPC_VELOCITY_MULTIPLIER
+
+  time_points = (0, 5, 10, 15, 20, 25,30)
+  speed_points = ((0, 0, 0, 0), (0, 0, 0, wz), (vx, 0, 0, 0), (0, 0, 0, -wz), (0, -vy, 0, 0),
+                  (0, 0, 0, 0), (0, 0, 0, wz))
+
+  speed = scipy.interpolate.interp1d(
+      time_points,
+      speed_points,
+      kind="previous",
+      fill_value="extrapolate",
+      axis=0)(
+          t)
+
+  return speed[0:3], speed[3]
+
 class RL_Env(gym.Env):
     def __init__(self, show_gui=False):
         self.obs =
@@ -57,6 +77,8 @@ class RL_Env(gym.Env):
             body_mass=robot_sim.MPC_BODY_MASS,
             body_inertia=robot_sim.MPC_BODY_INERTIA)
 
+        # self.lin_speed, self.ang_speed = _generate_example_linear_angular_speed(self._robot.GetTimeSinceReset)
+
         self.reset()
 
     def reset(self):
@@ -69,12 +91,12 @@ class RL_Env(gym.Env):
         p.setGravity(0, 0, -9.8)
         p.setPhysicsEngineParameter(enableConeFriction=0)
         p.setAdditionalSearchPath(pd.getDataPath())
-        terain = random.choice(["plane", "slope", "stair"])
+        terain = random.choice(["plane"])#, "slope", "stair"])
         world_class=WORLD_NAME_TO_CLASS_MAP[terain]
         world = world_class(p)
         world.build_world()
 
-        self._robot.reset()
+        self._robot.ResetPose()
         if self.show_gui:
             self.pybullet_client.configureDebugVisualizer(self.pybullet_client.COV_ENABLE_RENDERING, 1)
 
@@ -85,37 +107,43 @@ class RL_Env(gym.Env):
         self._swing_controller.reset(self._time_since_reset)
         self._stance_controller.reset(self._time_since_reset)
 
-        return self.get_observation()
+        return self.get_observation() # 27
     # def update_desired_speed(self, lin_speed, ang_speed):
     #     self._swing_controller.desired_speed = lin_speed
     #     self._swing_controller.desired_twisting_speed = ang_speed
     #     self._stance_controller.desired_speed = lin_speed
     #     self._stance_controller.desired_twisting_speed = ang_speed
 
-    # def get_observation(self):
-    #     gait_generator_state = self._gait_generator.get_observation()  # 16
-    #     base_height = self.robot.base_position[2:]
-    #     robot_orientation = self.robot.base_orientation_rpy
-    #     robot_velocity = np.array(self.robot.base_velocity)
-    #     if not self.use_real_robot:
-    #       robot_velocity *= np.random.uniform(0.8, 1.2)
-    #     robot_rpy_rate = self.robot.base_angular_velocity_body_frame  # 3
-    #     foot_position = self.robot.foot_positions_in_base_frame.flatten()  # 12
-    #     desired_velocity = self.get_desired_speed(self._time_since_reset)
-    #
-    #     if self.config.use_full_observation:
-    #       return np.concatenate(
-    #           (
-    #               gait_generator_state,  # 16
-    #               base_height,  # 1
-    #               robot_orientation,  # 3
-    #               robot_velocity,  # 3
-    #               robot_rpy_rate,  # 3
-    #               foot_position,  # 12
-    #               desired_velocity[:1],  # 1
-    #           ),
-    #           axis=-1,
-    #       )
+    def get_observation(self):
+
+        base_height = self._robot.GetTrueBasePosition()[2:]
+        robot_orientation = self._robot.GetBaseRollPitchYaw()
+        robot_velocity = np.array(self._robot.GetBaseVelocity())
+        # if not self.use_real_robot:
+        #   robot_velocity *= np.random.uniform(0.8, 1.2)
+        robot_rpy_rate = self._robot.GetBaseRollPitchYawRate() # 3
+        foot_position = self._robot.GetFootPositionsInBaseFrame().flatten()  # 12
+        foot_contact_state = np.array(
+            [(leg_state in (gait_generator_lib.LegState.STANCE,
+                            gait_generator_lib.LegState.EARLY_CONTACT,
+                            gait_generator_lib.LegState.LOSE_CONTACT))
+             for leg_state in self._gait_generator.leg_state], dtype=np.int32)
+        # lin_speed, ang_speed = _generate_example_linear_angular_speed(self._time_since_reset)
+        lin_speed = (0.45, 0, 0)
+
+        if self.config.use_full_observation:
+          return np.concatenate(
+              (
+                  base_height,  # 1
+                  robot_orientation,  # 3
+                  robot_velocity,  # 3
+                  robot_rpy_rate,  # 3
+                  foot_position,  # 12
+                  foot_contact_state, #4
+                  lin_speed[:1],  # 1
+              ),
+              axis=-1,
+          )
 
     def step(self, action):
         """
@@ -125,6 +153,7 @@ class RL_Env(gym.Env):
 
         """
         self._time_since_reset = self._clock() - self._reset_time
+        lin_speed,  ang_speed  = (0.45, 0, 0), 0
         f = action[0]
         sw_ratio = action[1] #meadn = 0.5 std =
         desired_height = action[2]
@@ -139,14 +168,14 @@ class RL_Env(gym.Env):
         self._stance_controller.PLANNING_HORIZON_STEPS, self._stance_controller.PLANNING_TIMESTEP)
 
 
-        self._swing_controller.desired_speed = self.desired_speed + desired_speed_offset
-        self._swing_controller.desired_twisting_speed = self.desired_twisting_speed + desired_twisting_speed_offset
+        self._swing_controller.desired_speed = lin_speed + desired_speed_offset
+        self._swing_controller.desired_twisting_speed = ang_speed + desired_twisting_speed_offset
         self._swing_controller.desired_height = desired_height
         self._swing_controller.foot_height = foot_height
         self._swing_controller.update(self._time_since_reset)
 
-        self._stance_controller.desired_speed = self.desired_speed + desired_speed_offset
-        self._stance_controller.desired_twisting_speed = self.desired_twisting_speed + desired_twisting_speed_offset
+        self._stance_controller.desired_speed = lin_speed+ desired_speed_offset
+        self._stance_controller.desired_twisting_speed = ang_speed + desired_twisting_speed_offset
         self._stance_controller._desired_body_height = desired_height
         self._stance_controller.update(self._time_since_reset, future_contact_estimate=future_contacts)
 
@@ -166,7 +195,9 @@ class RL_Env(gym.Env):
             logging.info("Unsafe, terminating episode...")
             break
         return self.get_observation(), sum_reward, done, dict()
+
     def _reward_fn(self, )
+
     @property
     def is_safe(self):
         rot_mat = np.array(

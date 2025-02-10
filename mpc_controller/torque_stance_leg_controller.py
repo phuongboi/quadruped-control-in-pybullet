@@ -132,9 +132,6 @@ class TorqueStanceLegController(object):
       contact_estimates = np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS)
     # com_position = np.array(self._robot.GetTrueBasePosition())
     com_position = np.array(self._state_estimator.com_position_ground_frame)
-
-
-
     # We use the body yaw aligned world frame for MPC computation.
     # com_roll_pitch_yaw = np.array(self._robot.GetBaseRollPitchYaw(),
     #                               dtype=np.float64)

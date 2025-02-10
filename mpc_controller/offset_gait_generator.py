@@ -64,8 +64,7 @@ class OffsetGaitGenerator(gait_generator.GaitGenerator):
              np.where(
                  np.fmod(self.current_phase, 2 * np.pi) < self.swing_cutoff, 0, 1),
              np.where(
-                 np.fmod(self.current_phase, 2 * np.pi) >= self.swing_cutoff, 0,
-                 1)))
+                 np.fmod(self.current_phase, 2 * np.pi) >= self.swing_cutoff, 0,1)))
 
     @property
     def desired_leg_state(self):

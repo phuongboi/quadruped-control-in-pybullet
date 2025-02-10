@@ -6,18 +6,12 @@ import gymnasium as gym
 import numpy as np
 import torch
 from rl_controller.ppo import PPO
+from envs.rl_env import RL_Env
 # init environment
 def train():
-    DEFAULT_GUI = True
-    DEFAULT_RECORD_VIDEO = False
-    DEFAULT_OUTPUT_FOLDER = 'results'
-    DEFAULT_COLAB = False
-
-    DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
-    DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 
 
-    env = FlyThruGateAvitary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    env = RL_Env(obs=DEFAULT_OBS, act=DEFAULT_ACT)
     # init agent
     state_dim = 36
     action_dim = 4
@@ -38,8 +32,8 @@ def train():
     lr_critic = 0.001       # learning rate for critic network
 
     random_seed = 0         # set random seed if required (0 = no random seed)
-    log_dir = "log_dir/"
-    run_num = "racing2/"
+    log_dir = "result/"
+    run_num = "try1/"
     log_f_name = log_dir + run_num + 'PPO_log' + ".csv"
     if not os.path.exists(os.path.join(log_dir, str(run_num))):
         os.mkdir(os.path.join(log_dir, str(run_num)))
@@ -50,8 +44,6 @@ def train():
     log_f = open(log_f_name,"w+")
     log_f.write('episode,timestep,reward\n')
     # log avg reward in the interval (in num timesteps)
-    print(env.EPISODE_LEN_SEC)
-    print(env.CTRL_FREQ)
     print("step per episode", env.EPISODE_LEN_SEC*env.CTRL_FREQ)
     update_timestep = env.EPISODE_LEN_SEC*env.CTRL_FREQ * 4
     print_freq = env.EPISODE_LEN_SEC*env.CTRL_FREQ  * 10        # print avg reward in the interval (in num timesteps)
