@@ -9,12 +9,10 @@ from rl_controller.ppo import PPO
 from envs.rl_env import RL_Env
 # init environment
 def train():
-
-
-    env = RL_Env(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+    env = RL_Env(show_gui=False)
     # init agent
-    state_dim = 36
-    action_dim = 4
+    state_dim = 27
+    action_dim = 8
     action_std = 0.6                    # starting std for action distribution (Multivariate Normal)
     action_std_decay_rate = 0.05        # linearly decay action_std (action_std = action_std - action_std_decay_rate)
     min_action_std = 0.1                # minimum action_std (stop decay after action_std <= min_action_std)
@@ -32,7 +30,7 @@ def train():
     lr_critic = 0.001       # learning rate for critic network
 
     random_seed = 0         # set random seed if required (0 = no random seed)
-    log_dir = "result/"
+    log_dir = "results/"
     run_num = "try1/"
     log_f_name = log_dir + run_num + 'PPO_log' + ".csv"
     if not os.path.exists(os.path.join(log_dir, str(run_num))):
@@ -58,73 +56,73 @@ def train():
 
     ppo_agent = PPO(state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, action_std)
 
-    start_time = datetime.now().replace(microsecond=0)
-    print("Started training at (GMT) : ", start_time)
-
     time_step = 0
     i_episode = 0
     while time_step <= max_training_timesteps:
-        obs, info = env.reset(seed=42, options={})
+        obs  = env.reset()
 
         current_ep_reward = 0
-        for i in range((env.EPISODE_LEN_SEC)*env.CTRL_FREQ):
-            action = ppo_agent.select_action(obs)
-            action = np.expand_dims(action, axis=0)
-            obs, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
+        for i in range((env.EPISODE_LEN_SEC)*env.SIM_FREQ):
+            if i % int((env.SIM_FREQ/env.CTRL_FREQ)) == 0:
+                action = ppo_agent.select_action(obs)
+                action = np.expand_dims(action, axis=0)
+
+            obs, reward, done, info = env.step(action)
+
             #print("Obs:", obs, "\tAction", action, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
              # saving reward and is_terminals
-            ppo_agent.buffer.rewards.append(reward)
-            ppo_agent.buffer.is_terminals.append(done)
+            if i % int((env.SIM_FREQ/env.CTRL_FREQ)) ==0:
+                ppo_agent.buffer.rewards.append(reward)
+                ppo_agent.buffer.is_terminals.append(done)
 
-            time_step += 1
-            current_ep_reward += reward
+                time_step += 1
+                current_ep_reward += reward
 
-            # update PPO agent
-            if time_step % update_timestep == 0:
-                ppo_agent.update()
+                # update PPO agent
+                if time_step % update_timestep == 0:
+                    ppo_agent.update()
 
-            if time_step % action_std_decay_freq == 0:
-                ppo_agent.decay_action_std(action_std_decay_rate, min_action_std)
+                if time_step % action_std_decay_freq == 0:
+                    ppo_agent.decay_action_std(action_std_decay_rate, min_action_std)
 
-            if time_step % log_freq == 0:
+                if time_step % log_freq == 0:
+                    print(time_step)
+                    # log average reward till last episode
+                    log_avg_reward = log_running_reward / log_running_episodes
+                    log_avg_reward = round(log_avg_reward, 4)
 
-                # log average reward till last episode
-                log_avg_reward = log_running_reward / log_running_episodes
-                log_avg_reward = round(log_avg_reward, 4)
+                    log_f.write('{}, {}, {}\n'.format(i_episode, time_step, log_avg_reward))
+                    log_f.flush()
 
-                log_f.write('{}, {}, {}\n'.format(i_episode, time_step, log_avg_reward))
-                log_f.flush()
+                    log_running_reward = 0
+                    log_running_episodes = 0
 
-                log_running_reward = 0
-                log_running_episodes = 0
+                if time_step % print_freq == 0:
 
-            if time_step % print_freq == 0:
+                    # print average reward till last episode
+                    print_avg_reward = print_running_reward / print_running_episodes
+                    print_avg_reward = round(print_avg_reward, 2)
 
-                # print average reward till last episode
-                print_avg_reward = print_running_reward / print_running_episodes
-                print_avg_reward = round(print_avg_reward, 2)
-
-                print("Episode : {} \t\t Timestep : {} \t\t Average Reward : {}".format(i_episode, time_step, print_avg_reward))
-
-
-                print_running_reward = 0
-                print_running_episodes = 0
+                    print("Episode : {} \t\t Timestep : {} \t\t Average Reward : {}".format(i_episode, time_step, print_avg_reward))
 
 
-            # save model weights
-            if time_step % save_model_freq == 0:
-                print("--------------------------------------------------------------------------------------------")
-                checkpoint_path = os.path.join(log_dir, str(run_num), str(i_episode) +"_ppo_drone.pth")
-                print("saving model at : " + checkpoint_path)
-                ppo_agent.save(checkpoint_path)
-                print("model saved")
-                print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
-                print("--------------------------------------------------------------------------------------------")
+                    print_running_reward = 0
+                    print_running_episodes = 0
 
-            # break; if the episode is over
-            if done:
-                break
+
+                # save model weights
+                if time_step % save_model_freq == 0:
+                    print("--------------------------------------------------------------------------------------------")
+                    checkpoint_path = os.path.join(log_dir, str(run_num), str(i_episode) +"_ppo_drone.pth")
+                    print("saving model at : " + checkpoint_path)
+                    ppo_agent.save(checkpoint_path)
+                    print("model saved")
+                    print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
+                    print("--------------------------------------------------------------------------------------------")
+
+                # break; if the episode is over
+                if done:
+                    break
 
 
         print_running_reward += current_ep_reward
@@ -135,11 +133,8 @@ def train():
 
         i_episode += 1
 
-
     log_f.close()
     env.close()
-
-
 
     # print total training time
     print("============================================================================================")

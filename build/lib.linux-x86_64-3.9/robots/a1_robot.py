@@ -247,7 +247,7 @@ class SimpleRobot(object):
     self._BuildJointNameToIdDict()
     self._BuildUrdfIds()
     self._BuildMotorIdList()
-    self.ResetPose()
+    self.ResetPose(robot_uid)
     self._motor_enabled_list = [True] * self.num_motors
     self._state_action_counter = 0
     self._motor_offset= np.array([0]*12)
@@ -262,7 +262,8 @@ class SimpleRobot(object):
     self._foot_contact_history[:, 2] = - MPC_BODY_HEIGHT
     self.MPC_BODY_HEIGHT = MPC_BODY_HEIGHT
 
-  def ResetPose(self):
+  def ResetPose(self, robot_uid):
+    self.quadruped = robot_uid
     for name in self._joint_name_to_id:
       joint_id = self._joint_name_to_id[name]
       self.pybullet_client.setJointMotorControl2(
@@ -284,8 +285,8 @@ class SimpleRobot(object):
       self.pybullet_client.resetJointState(
           self.quadruped, self._joint_name_to_id[name], angle, targetVelocity=0)
 
-      # self._last_timestamp = self.GetTimeSinceReset()
-      # self._step_counter = 0
+      self._last_timestamp = self.GetTimeSinceReset()
+      self._step_counter = 0
 
 
   def _SettleDownForReset(self, reset_time):
@@ -472,6 +473,7 @@ class SimpleRobot(object):
     """
     velocity, _ = self.pybullet_client.getBaseVelocity(self.quadruped)
     return velocity
+
   def GetTrueBasePosition(self):
       return np.array(
         self.pybullet_client.getBasePositionAndOrientation(self.quadruped)[0])
@@ -653,8 +655,6 @@ class SimpleRobot(object):
       self._StepInternal(proc_action, motor_control_mode=MOTOR_CONTROL_HYBRID)
       self.UpdateContactHistory()
       self._step_counter += 1
-
-
 
   def _BuildJointNameToIdDict(self):
     num_joints = self.pybullet_client.getNumJoints(self.quadruped)

@@ -52,7 +52,7 @@ class TorqueStanceLegController(object):
                           float, float] = (0.07335, 0, 0, 0, 0.25068, 0, 0, 0,
                                            0.25447),
       num_legs: int = 4,
-      friction_coeffs: Sequence[float] = (0.3, 0.3, 0.3, 0.3),
+      friction_coeffs: Sequence[float] = (0.6, 0.6, 0.6, 0.6),
       qp_solver = convex_mpc.QPOASES
   ):
     """Initializes the class.
@@ -132,9 +132,6 @@ class TorqueStanceLegController(object):
       contact_estimates = np.array([foot_contact_state] * _PLANNING_HORIZON_STEPS)
     # com_position = np.array(self._robot.GetTrueBasePosition())
     com_position = np.array(self._state_estimator.com_position_ground_frame)
-
-
-
     # We use the body yaw aligned world frame for MPC computation.
     # com_roll_pitch_yaw = np.array(self._robot.GetBaseRollPitchYaw(),
     #                               dtype=np.float64)

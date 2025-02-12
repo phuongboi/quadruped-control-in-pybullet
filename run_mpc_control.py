@@ -127,7 +127,7 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
   p.setAdditionalSearchPath(pd.getDataPath())
   p.setPhysicsEngineParameter(numSolverIterations=30) #same
   p.setPhysicsEngineParameter(enableConeFriction=1)
-  simulation_time_step = 0.0012
+  simulation_time_step = 0.002
   p.setTimeStep(simulation_time_step)
 
   p.setGravity(0, 0, -9.8)
@@ -156,10 +156,12 @@ def _run_example(max_time=_MAX_TIME_SECONDS):
 
     # Updates the controller behavior parameters.
     # lin_speed, ang_speed = _generate_example_linear_angular_speed(current_time)
+    # print(lin_speed, ang_speed)
     lin_speed, ang_speed = (0.45, 0., 0.), 0.
     _update_controller_params(controller, lin_speed, ang_speed)
 
     # Needed before every call to get_action().
+    # time.sleep(0.05)
     controller.update()
     hybrid_action, info = controller.get_action()
 

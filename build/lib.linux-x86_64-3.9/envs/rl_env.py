@@ -58,7 +58,6 @@ class RL_Env(gym.Env):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.setAdditionalSearchPath(pd.getDataPath())
         self.simulation_time_step = 0.002
-        self.SIM_FREQ = int(1/self.simulation_time_step)
         self.pybullet_client = p
         # construct robot class
         robot_uid = p.loadURDF("data/a1.urdf", robot_sim.START_POS)
@@ -98,7 +97,7 @@ class RL_Env(gym.Env):
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         p.resetSimulation()
         p.setPhysicsEngineParameter(numSolverIterations=30)
-        p.setTimeStep(self.simulation_time_step)
+        p.setTimeStep(0.001)
         p.setGravity(0, 0, -9.8)
         p.setPhysicsEngineParameter(enableConeFriction=0)
         p.setAdditionalSearchPath(pd.getDataPath())
@@ -173,7 +172,7 @@ class RL_Env(gym.Env):
 
         self._state_estimator.update(self._time_since_reset)
         future_contacts = self._gait_generator.get_estimated_contact_states(
-        self._stance_controller._PLANNING_HORIZON_STEPS, self._stance_controller._PLANNING_TIMESTEP)
+        self._stance_controller.PLANNING_HORIZON_STEPS, self._stance_controller.PLANNING_TIMESTEP)
 
 
         self._swing_controller.desired_speed = self.desired_speed + desired_speed_offset
@@ -197,19 +196,20 @@ class RL_Env(gym.Env):
                 cameraPitch=-30,
                 cameraTargetPosition=self._robot.GetTrueBasePosition(),
             )
-        reward = self._reward_fn(action)
+        sum_reward += self._reward_fn(action)
         done = not self.is_safe
-        return self.get_observation(), reward, done, dict()
+        return self.get_observation(), sum_reward, done, dict()
 
     def _reward_fn(self, action):
         # del action # unused
-        desired_lin_speed, desired_ang_rate = np.array((0.45, 0., 0.)), np.array((0, 0, 0))
+        desired_lin_speed, desired_ang_rate = (0.45, 0., 0.), (0, 0, 0)
 
-        actual_lin_speed = self._robot.GetBaseVelocity()[0]
-        tracking_lin_speed = (desired_lin_speed[0] - actual_lin_speed)**2
+        actual_lin_speed = self._robot.GetBaseVelocity()
+        tracking_lin_speed = (desired_lin_speed - actual_speed)**2
 
-        actual_ang_rate = self._robot.GetBaseRollPitchYawRate()[0]
-        tracking_ang_rate = (desired_ang_rate[0] - actual_ang_rate)**2
+        actual_ang_rate = self._robot.GetBaseRollPitchYawRate()
+        tracking_ang_rate = (desired_ang_rate - actual_ang_rate)**2
+
 
         rew = 3 - tracking_lin_speed - tracking_ang_rate
 
