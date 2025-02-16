@@ -26,7 +26,7 @@ def train():
 
     eps_clip = 0.2          # clip parameter for PPO
     gamma = 0.99            # discount factor
-    lr_actor = 0.0003       # learning rate for actor network
+    lr_actor = 0.003       # learning rate for actor network
     lr_critic = 0.001       # learning rate for critic network
 
     random_seed = 0         # set random seed if required (0 = no random seed)
@@ -46,7 +46,7 @@ def train():
     update_timestep = env.EPISODE_LEN_SEC*env.CTRL_FREQ * 4
     print_freq = env.EPISODE_LEN_SEC*env.CTRL_FREQ  * 10        # print avg reward in the interval (in num timesteps)
     log_freq =  env.EPISODE_LEN_SEC*env.CTRL_FREQ * 2
-    save_model_freq = int(1e5)          # save model frequency (in num timesteps)
+    save_model_freq =env.EPISODE_LEN_SEC*env.CTRL_FREQ * 4         # save model frequency (in num timesteps)
     # printing and logging variables
     print_running_reward = 0
     print_running_episodes = 0
@@ -68,8 +68,6 @@ def train():
                 action = np.expand_dims(action, axis=0)
 
             obs, reward, done, info = env.step(action)
-
-            #print("Obs:", obs, "\tAction", action, "\tReward:", reward, "\tTerminated:", terminated, "\tTruncated:", truncated)
              # saving reward and is_terminals
             if i % int((env.SIM_FREQ/env.CTRL_FREQ)) ==0:
                 ppo_agent.buffer.rewards.append(reward)
@@ -86,7 +84,6 @@ def train():
                     ppo_agent.decay_action_std(action_std_decay_rate, min_action_std)
 
                 if time_step % log_freq == 0:
-                    print(time_step)
                     # log average reward till last episode
                     log_avg_reward = log_running_reward / log_running_episodes
                     log_avg_reward = round(log_avg_reward, 4)
@@ -112,13 +109,9 @@ def train():
 
                 # save model weights
                 if time_step % save_model_freq == 0:
-                    print("--------------------------------------------------------------------------------------------")
                     checkpoint_path = os.path.join(log_dir, str(run_num), str(i_episode) +"_ppo_drone.pth")
                     print("saving model at : " + checkpoint_path)
                     ppo_agent.save(checkpoint_path)
-                    print("model saved")
-                    print("Elapsed Time  : ", datetime.now().replace(microsecond=0) - start_time)
-                    print("--------------------------------------------------------------------------------------------")
 
                 # break; if the episode is over
                 if done:
@@ -135,14 +128,6 @@ def train():
 
     log_f.close()
     env.close()
-
-    # print total training time
-    print("============================================================================================")
-    end_time = datetime.now().replace(microsecond=0)
-    print("Started training at (GMT) : ", start_time)
-    print("Finished training at (GMT) : ", end_time)
-    print("Total training time  : ", end_time - start_time)
-    print("============================================================================================")
 
 
 if __name__ == '__main__':

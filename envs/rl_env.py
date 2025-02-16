@@ -42,13 +42,13 @@ def _generate_example_linear_angular_speed(t):
   return speed[0:3], speed[3]
 
 class RL_Env(gym.Env):
-    def __init__(self, show_gui=False):
+    def __init__(self, show_gui=False, world=None):
         self.EPISODE_LEN_SEC = 12
         self.CTRL_FREQ = 20
-        self.action_high = np.array([4, 0.99, 0.3, 0.25, 0.1, 0.1, 0.1, 0.1])
-        self.action_low = np.array([0.001, 0.01, 0.1, 0.01,-0.1,-0.1,-0.1,-0.1])
+        self.action_high = np.array([4, 0.99, 0.35, 0.25, 0.1, 0.1, 0.1, 0.1])
+        self.action_low = np.array([0.1, 0.01, 0.1, 0.01,-0.1,-0.1,-0.1,-0.1])
         self.desired_speed, self.desired_twisting_speed = (0.45, 0, 0), 0
-
+        self.world = world
         self.show_gui = show_gui
         if show_gui:
             p = bullet_client.BulletClient(connection_mode=pybullet.GUI)
@@ -103,6 +103,8 @@ class RL_Env(gym.Env):
         p.setPhysicsEngineParameter(enableConeFriction=0)
         p.setAdditionalSearchPath(pd.getDataPath())
         terain = random.choice(["plane", "slope", "stair","uneven"])
+        if self.world != None:
+            terain = self.world
         world_class=WORLD_NAME_TO_CLASS_MAP[terain]
         world = world_class(p)
         world.build_world()
@@ -160,9 +162,8 @@ class RL_Env(gym.Env):
         action_mid = (self.action_low + self.action_high) / 2
         action_range = (self.action_high - self.action_low) / 2
         action = (action * action_range + action_mid).squeeze()
-
         f = action[0]
-        sw_ratio = action[1] #meadn = 0.5 std =
+        sw_ratio = action[1]
         desired_height = action[2]
         foot_height = action[3]
         desired_speed_offset = action[4:7]
@@ -205,15 +206,16 @@ class RL_Env(gym.Env):
         # del action # unused
         desired_lin_speed, desired_ang_rate = np.array((0.45, 0., 0.)), np.array((0, 0, 0))
 
-        actual_lin_speed = self._robot.GetBaseVelocity()[0]
-        tracking_lin_speed = (desired_lin_speed[0] - actual_lin_speed)**2
+        actual_lin_speed = self._robot.GetBaseVelocity()
+        tracking_lin_speed = np.linalg.norm(desired_lin_speed - actual_lin_speed)
+        actual_ang_rate = self._robot.GetBaseRollPitchYawRate()
+        tracking_ang_rate = np.linalg.norm(desired_ang_rate - actual_ang_rate)
+        reward = 10 - 5*tracking_lin_speed # - tracking_ang_rate
+        # reward = max(0, 1 - tracking_lin_speed) + max(0, 1 - tracking_ang_rate)
+        if not self.is_safe:
+            reward = -10
 
-        actual_ang_rate = self._robot.GetBaseRollPitchYawRate()[0]
-        tracking_ang_rate = (desired_ang_rate[0] - actual_ang_rate)**2
-
-        rew = 3 - tracking_lin_speed - tracking_ang_rate
-
-        return rew
+        return reward
 
     @property
     def is_safe(self):
