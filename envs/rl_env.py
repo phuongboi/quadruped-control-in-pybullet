@@ -44,7 +44,7 @@ def _generate_example_linear_angular_speed(t):
 class RL_Env(gym.Env):
     def __init__(self, show_gui=False, world=None):
         self.EPISODE_LEN_SEC = 12
-        self.CTRL_FREQ = 20
+        self.CTRL_FREQ = 50
         self.action_high = np.array([4, 0.99, 0.35, 0.25, 0.1, 0.1, 0.1, 0.1])
         self.action_low = np.array([0.1, 0.01, 0.1, 0.01,-0.1,-0.1,-0.1,-0.1])
         self.desired_speed, self.desired_twisting_speed = (0.45, 0, 0), 0
@@ -159,9 +159,11 @@ class RL_Env(gym.Env):
         """
         self._time_since_reset = self._clock() - self._reset_time
         # lin_speed,  ang_speed  = (0.45, 0, 0), 0
+        print("original action", action)
         action_mid = (self.action_low + self.action_high) / 2
         action_range = (self.action_high - self.action_low) / 2
         action = (action * action_range + action_mid).squeeze()
+        print("rescale action", action)
         f = action[0]
         sw_ratio = action[1]
         desired_height = action[2]

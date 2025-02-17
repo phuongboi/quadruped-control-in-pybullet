@@ -9,7 +9,7 @@ from rl_controller.ppo import PPO
 from envs.rl_env import RL_Env
 # init environment
 def train():
-    env = RL_Env(show_gui=False)
+    env = RL_Env(show_gui=False, world="plane")
     # init agent
     state_dim = 27
     action_dim = 8
@@ -27,7 +27,7 @@ def train():
     eps_clip = 0.2          # clip parameter for PPO
     gamma = 0.99            # discount factor
     lr_actor = 0.003       # learning rate for actor network
-    lr_critic = 0.001       # learning rate for critic network
+    lr_critic = 0.01       # learning rate for critic network
 
     random_seed = 0         # set random seed if required (0 = no random seed)
     log_dir = "results/"
@@ -35,7 +35,7 @@ def train():
     log_f_name = log_dir + run_num + 'PPO_log' + ".csv"
     if not os.path.exists(os.path.join(log_dir, str(run_num))):
         os.mkdir(os.path.join(log_dir, str(run_num)))
-    checkpoint_path = log_dir + "ppo_drone.pth"
+    checkpoint_path = log_dir + "ppo_quadrupted.pth"
 
     print("current logging run number for " + " gym pybulet drone : ", run_num)
     print("logging at : " + log_f_name)
@@ -109,7 +109,7 @@ def train():
 
                 # save model weights
                 if time_step % save_model_freq == 0:
-                    checkpoint_path = os.path.join(log_dir, str(run_num), str(i_episode) +"_ppo_drone.pth")
+                    checkpoint_path = os.path.join(log_dir, str(run_num), str(i_episode) +"_ppo_quadrupted.pth")
                     print("saving model at : " + checkpoint_path)
                     ppo_agent.save(checkpoint_path)
 
